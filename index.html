@@ -134,6 +134,12 @@ const saveSession = (v)=>ls.set('ap_session',v);
 async function boot(){
   hideSplash();
 
+  // ── Super Admin route check ──
+  if(window.location.search==='?superadmin'){
+    showScreen('screen-superadmin');
+    return;
+  }
+
   // ── Kiosk session restore — check before anything else ──
   var kSess=localStorage.getItem('ap_kiosk_session');
   if(kSess){
@@ -2240,8 +2246,86 @@ window.printQR=function(){
 };
 
 // ─────────────────────────────────────────────
-//  KIOSK LOGIN (standalone screen)
+//  SUPER ADMIN
 // ─────────────────────────────────────────────
+var SA_PASS_DOC='superadmin_config'; // Firestore doc path: meta/superadmin_config
+
+window.saLogin=async function(){
+  var pass=document.getElementById('sa-pass').value.trim();
+  if(!pass)return toast('Enter password',true);
+  setLoading(true,'Verifying…');
+  try{
+    // Read password from Firestore meta collection
+    var snap=await getDoc(doc(db,'meta',SA_PASS_DOC));
+    if(!snap.exists()){setLoading(false);return toast('Super admin not configured',true);}
+    var cfg=snap.data();
+    if(cfg.password!==pass){setLoading(false);document.getElementById('sa-pass').value='';return toast('Wrong password',true);}
+    // Access granted
+    sessionStorage.setItem('sa_auth','1');
+    document.getElementById('sa-login-wrap').style.display='none';
+    document.getElementById('sa-dashboard-wrap').style.display='block';
+    setLoading(false);
+    saLoadDashboard();
+  }catch(e){setLoading(false);toast('Error: '+e.message,true);}
+};
+
+window.saLogout=function(){
+  sessionStorage.removeItem('sa_auth');
+  document.getElementById('sa-login-wrap').style.display='block';
+  document.getElementById('sa-dashboard-wrap').style.display='none';
+  document.getElementById('sa-pass').value='';
+};
+
+async function saLoadDashboard(){
+  try{
+    var allBiz=await getDocs(collection(db,'businesses'));
+    var bizList=[];
+    allBiz.forEach(function(d){bizList.push(Object.assign({id:d.id},d.data()));});
+
+    document.getElementById('sa-total-biz').textContent=bizList.length;
+
+    // Load staff counts in parallel
+    var staffCounts=await Promise.all(bizList.map(function(b){
+      return getDocs(collection(db,'businesses',b.id,'staff'))
+        .then(function(s){return s.size;}).catch(function(){return 0;});
+    }));
+
+    // Load advance totals in parallel
+    var advTotals=await Promise.all(bizList.map(function(b){
+      return getDocs(collection(db,'businesses',b.id,'advLedger'))
+        .then(function(s){
+          var total=0;
+          s.forEach(function(d){total+=d.data().balance||0;});
+          return total;
+        }).catch(function(){return 0;});
+    }));
+
+    var totalStaff=staffCounts.reduce(function(a,b){return a+b;},0);
+    var totalAdv=advTotals.reduce(function(a,b){return a+b;},0);
+    document.getElementById('sa-total-staff').textContent=totalStaff;
+    document.getElementById('sa-total-adv').textContent='₹'+totalAdv.toLocaleString('en-IN');
+
+    // Render business cards
+    var html=bizList.map(function(b,i){
+      var sc=staffCounts[i];
+      var adv=advTotals[i];
+      var joined=b.createdAt?new Date(b.createdAt).toLocaleDateString('en-IN'):'—';
+      return '<div class="card" style="margin-bottom:12px;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">'
+        +'<div><div style="font-weight:800;font-size:15px;font-family:var(--fh);">'+( b.name||'—')+'</div>'
+        +'<div style="font-size:12px;color:var(--muted);">'+(b.location||'')+'</div></div>'
+        +'<div style="font-size:11px;color:var(--muted);text-align:right;">Code: <strong>'+(b.companyCode||'—')+'</strong></div>'
+        +'</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'
+        +'<div style="background:var(--s1);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:var(--green);">'+sc+'</div><div style="font-size:10px;color:var(--muted);">Staff</div></div>'
+        +'<div style="background:var(--s1);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:14px;font-weight:800;color:'+(adv>0?'var(--red)':'var(--muted)')+';">₹'+adv.toLocaleString('en-IN')+'</div><div style="font-size:10px;color:var(--muted);">Advances</div></div>'
+        +'<div style="background:var(--s1);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:11px;font-weight:700;color:var(--muted);">'+joined+'</div><div style="font-size:10px;color:var(--muted);">Joined</div></div>'
+        +'</div>'
+        +'</div>';
+    }).join('');
+    document.getElementById('sa-biz-list').innerHTML=html||'<div class="empty-state"><div class="emoji">🏢</div>No businesses yet</div>';
+  }catch(e){toast('Error loading dashboard: '+e.message,true);}
+}
 var ksBiz=null, ksBizId=null, ksStaffArr=[], ksSettings={};
 var ksSelectedStaff=null, ksPinEntry='', ksSelfieData=null;
 var ksCountdownTimer=null, ksVideoStream=null;
@@ -3140,7 +3224,7 @@ textarea.form-input{resize:none;}
     <div class="landing-logo">AP</div>
     <div style="font-family:var(--fh);font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:8px;">Manage your staff<br><span style="background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">the smart way</span></div>
     <div style="color:var(--muted);font-size:14px;line-height:1.6;max-width:320px;margin:0 auto 14px;">Attendance, payroll, leaves & advances — all in one place. Built for small businesses.</div>
-    <span style="display:inline-block;font-size:12px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;padding:5px 16px;letter-spacing:.5px;margin-bottom:20px;box-shadow:0 4px 14px rgba(245,166,35,.35);">v1.17.8</span>
+    <span style="display:inline-block;font-size:12px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;padding:5px 16px;letter-spacing:.5px;margin-bottom:20px;box-shadow:0 4px 14px rgba(245,166,35,.35);">v1.18.0</span>
   </div>
   <div class="feature-grid">
     <div class="feature-card"><div class="feature-icon">👁️</div><div class="feature-title">Selfie Proof</div><div class="feature-desc">Anti-proxy attendance with photo verification</div></div>
@@ -3750,6 +3834,45 @@ textarea.form-input{resize:none;}
   </div>
 </div>
 
+<!-- ══ SUPER ADMIN ══ -->
+<div class="screen" id="screen-superadmin">
+  <div style="padding:24px 20px;max-width:580px;margin:0 auto;">
+    <!-- Login -->
+    <div id="sa-login-wrap">
+      <div style="text-align:center;padding:40px 0 24px;">
+        <div style="font-size:36px;margin-bottom:8px;">🛡️</div>
+        <div style="font-size:22px;font-weight:800;font-family:var(--fh);">Super Admin</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:4px;">AttendPro · AppCentrik</div>
+      </div>
+      <div class="card">
+        <div class="form-group"><label class="form-label">Password</label>
+          <input type="password" class="form-input" id="sa-pass" placeholder="Enter super admin password" onkeydown="if(event.key==='Enter')saLogin()">
+        </div>
+        <button class="btn btn-primary" onclick="saLogin()">Access Dashboard →</button>
+      </div>
+    </div>
+    <!-- Dashboard -->
+    <div id="sa-dashboard-wrap" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 0 12px;">
+        <div>
+          <div style="font-size:18px;font-weight:800;font-family:var(--fh);">🛡️ Super Admin</div>
+          <div style="font-size:12px;color:var(--muted);">AttendPro · AppCentrik</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="saLogout()">Logout</button>
+      </div>
+      <!-- Stats row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;" id="sa-stats-row">
+        <div class="stat-box"><div class="stat-num" id="sa-total-biz" style="color:var(--accent);">—</div><div class="stat-lbl">Businesses</div></div>
+        <div class="stat-box"><div class="stat-num" id="sa-total-staff" style="color:var(--green);">—</div><div class="stat-lbl">Total Staff</div></div>
+        <div class="stat-box"><div class="stat-num" id="sa-total-adv" style="color:var(--red);">—</div><div class="stat-lbl">Advances</div></div>
+      </div>
+      <!-- Business list -->
+      <div class="card-title" style="margin-bottom:10px;">Businesses</div>
+      <div id="sa-biz-list"><div class="empty-state"><div class="emoji">⏳</div>Loading…</div></div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ SELFIE LIGHTBOX MODAL ══ -->
 <div id="selfie-modal" onclick="closeSelfieModal()" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;flex-direction:column;gap:14px;">
   <img id="selfie-modal-img" src="" style="width:280px;height:280px;border-radius:50%;object-fit:cover;border:4px solid #fff;box-shadow:0 8px 40px rgba(0,0,0,.6);">
@@ -3987,7 +4110,7 @@ window.joinBusiness = async function(){
     <div class="card-sm" style="margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div><div style="font-family:var(--fh);font-size:14px;font-weight:700;">AttendPro</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Staff Management Platform</div></div>
-        <span style="font-size:11px;font-weight:700;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:20px;padding:3px 10px;">v1.17.8</span>
+        <span style="font-size:11px;font-weight:700;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:20px;padding:3px 10px;">v1.18.0</span>
       </div>
     </div>
     <div class="card-sm" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
@@ -3995,10 +4118,10 @@ window.joinBusiness = async function(){
       <button class="btn btn-ghost btn-sm" onclick="toggleNotifications()" id="notif-toggle-btn">Enable</button>
     </div>
     <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">📋 What's New</div>
-    <!-- v1.17.8 -->
+    <!-- v1.18.0 -->
     <div style="margin-bottom:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--accent);">v1.17.8</span>
+        <span style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--accent);">v1.18.0</span>
         <span style="font-size:10px;font-weight:700;color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:2px 7px;">CURRENT</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:7px;">
