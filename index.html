@@ -22,7 +22,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-         collection, addDoc, getDocs, query, where, orderBy, onSnapshot,
+         collection, addDoc, getDocs, query, where, orderBy, onSnapshot, limit,
          serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ▼▼▼ PASTE YOUR FIREBASE CONFIG BELOW ▼▼▼
@@ -2315,12 +2315,21 @@ window.saLoadDashboard=async function(){
 
     // Load advance totals in parallel
     var advTotals=await Promise.all(bizList.map(function(b){
-      return getDocs(collection(db,'businesses',b.id,'advLedger'))
+      return getDocs(collection(db,'businesses',b.id,'advance_ledger'))
         .then(function(s){
           var total=0;
           s.forEach(function(d){total+=d.data().balance||0;});
           return total;
         }).catch(function(){return 0;});
+    }));
+
+    // Load most recent attendance date per business, in parallel
+    var lastPunches=await Promise.all(bizList.map(function(b){
+      return getDocs(query(collection(db,'businesses',b.id,'attendance'),orderBy('date','desc'),limit(1)))
+        .then(function(s){
+          if(s.empty)return null;
+          return s.docs[0].data().date||null;
+        }).catch(function(){return null;});
     }));
 
     var totalStaff=staffCounts.reduce(function(a,b){return a+b;},0);
@@ -2336,6 +2345,18 @@ window.saLoadDashboard=async function(){
         var sc=staffCounts[bizList.indexOf(b)];
         var adv=advTotals[bizList.indexOf(b)];
         var joined=b.createdAt?new Date(b.createdAt).toLocaleDateString('en-IN'):'—';
+        var lastPunchDate=lastPunches[bizList.indexOf(b)];
+        var activityHtml;
+        if(!lastPunchDate){
+          activityHtml='<span style="color:var(--muted);">●</span> No punches yet';
+        }else{
+          var todayD=new Date();
+          var lpD=new Date(lastPunchDate+'T00:00:00');
+          var daysAgo=Math.round((todayD.setHours(0,0,0,0)-lpD.getTime())/86400000);
+          var dotColor=daysAgo<=2?'var(--green)':(daysAgo<=7?'var(--accent)':'var(--red)');
+          var agoText=daysAgo<=0?'Today':(daysAgo===1?'Yesterday':daysAgo+'d ago');
+          activityHtml='<span style="color:'+dotColor+';">●</span> Last punch: <strong>'+new Date(lastPunchDate+'T00:00:00').toLocaleDateString('en-IN')+'</strong> ('+agoText+')';
+        }
         var actionBtn=isArchived
           ?'<button class="sa-biz-btn" data-action="restore" data-id="'+b.id+'" data-name="'+( b.name||'').replace(/"/g,'&quot;')+'" style="background:none;border:1px solid var(--green);color:var(--green);border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;">✅ Restore</button>'
           :'<button class="sa-biz-btn" data-action="archive" data-id="'+b.id+'" data-name="'+( b.name||'').replace(/"/g,'&quot;')+'" style="background:none;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;">📦 Archive</button>';
@@ -2352,6 +2373,7 @@ window.saLoadDashboard=async function(){
           +'<div style="background:var(--s1);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:14px;font-weight:800;color:'+(adv>0?'var(--red)':'var(--muted)')+';">₹'+adv.toLocaleString('en-IN')+'</div><div style="font-size:10px;color:var(--muted);">Advances</div></div>'
           +'<div style="background:var(--s1);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:11px;font-weight:700;color:var(--muted);">'+joined+'</div><div style="font-size:10px;color:var(--muted);">Joined</div></div>'
           +'</div>'
+          +'<div style="margin-top:8px;font-size:11px;color:var(--muted);">'+activityHtml+'</div>'
           +'</div>';
       }
 
@@ -3266,7 +3288,7 @@ textarea.form-input{resize:none;}
     <div class="landing-logo">AP</div>
     <div style="font-family:var(--fh);font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:8px;">Manage your staff<br><span style="background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">the smart way</span></div>
     <div style="color:var(--muted);font-size:14px;line-height:1.6;max-width:320px;margin:0 auto 14px;">Attendance, payroll, leaves & advances — all in one place. Built for small businesses.</div>
-    <span style="display:inline-block;font-size:12px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;padding:5px 16px;letter-spacing:.5px;margin-bottom:20px;box-shadow:0 4px 14px rgba(245,166,35,.35);">v1.18.5</span>
+    <span style="display:inline-block;font-size:12px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;padding:5px 16px;letter-spacing:.5px;margin-bottom:20px;box-shadow:0 4px 14px rgba(245,166,35,.35);">v1.18.6</span>
   </div>
   <div class="feature-grid">
     <div class="feature-card"><div class="feature-icon">👁️</div><div class="feature-title">Selfie Proof</div><div class="feature-desc">Anti-proxy attendance with photo verification</div></div>
@@ -4150,7 +4172,7 @@ window.joinBusiness = async function(){
     <div class="card-sm" style="margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div><div style="font-family:var(--fh);font-size:14px;font-weight:700;">AttendPro</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Staff Management Platform</div></div>
-        <span style="font-size:11px;font-weight:700;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:20px;padding:3px 10px;">v1.18.5</span>
+        <span style="font-size:11px;font-weight:700;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:20px;padding:3px 10px;">v1.18.6</span>
       </div>
     </div>
     <div class="card-sm" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
@@ -4158,11 +4180,22 @@ window.joinBusiness = async function(){
       <button class="btn btn-ghost btn-sm" onclick="toggleNotifications()" id="notif-toggle-btn">Enable</button>
     </div>
     <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">📋 What's New</div>
+    <!-- v1.18.6 -->
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--accent);">v1.18.6</span>
+        <span style="font-size:10px;font-weight:700;color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:2px 7px;">CURRENT</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px;">
+        <div style="font-size:13px;display:flex;gap:8px;"><span style="color:var(--green);flex-shrink:0;font-weight:700;">+</span><span>Fixed super admin dashboard — Advances stat was always showing ₹0 due to a wrong collection name</span></div>
+        <div style="font-size:13px;display:flex;gap:8px;"><span style="color:var(--green);flex-shrink:0;font-weight:700;">+</span><span>Business cards now show last punch-in date with a color-coded activity indicator</span></div>
+      </div>
+    </div>
+    <div style="height:1px;background:var(--border);margin-bottom:16px;"></div>
     <!-- v1.18.5 -->
     <div style="margin-bottom:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--accent);">v1.18.5</span>
-        <span style="font-size:10px;font-weight:700;color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:2px 7px;">CURRENT</span>
+        <span style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--text);">v1.18.5</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:7px;">
         <div style="font-size:13px;display:flex;gap:8px;"><span style="color:var(--green);flex-shrink:0;font-weight:700;">+</span><span>Hotfix — restored missing saLoadDashboard function wrapper that was breaking app load on all devices</span></div>
