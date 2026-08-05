@@ -2197,11 +2197,46 @@ function renderQRCode(){
 }
 window.printQR=function(){
   const el=document.getElementById('qr-render');
+  if(!el)return;
   const w=window.open('','_blank');
-  w.document.write(`<html><body style="text-align:center;padding:40px;font-family:sans-serif"><h2>${biz?.name}</h2><p style="color:#666;margin-bottom:24px">${biz?.location||''} · Scan to Punch In / Out</p>${el.innerHTML}<p style="color:#999;font-size:12px;margin-top:16px">Staff only</p></body></html>`);
+  if(!w){toast('Please allow popups to print QR',true);return;}
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8">';
+  html+='<style>';
+  html+='*{margin:0;padding:0;box-sizing:border-box;}';
+  html+='body{font-family:\'Segoe UI\',Arial,sans-serif;background:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;}';
+  html+='.card{width:360px;border:3px solid #f5a623;border-radius:24px;padding:36px 32px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.12);}';
+  html+='.logo{font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#f5a623;margin-bottom:6px;}';
+  html+='.biz{font-size:28px;font-weight:900;color:#111;margin-bottom:4px;line-height:1.2;}';
+  html+='.loc{font-size:13px;color:#888;margin-bottom:24px;}';
+  html+='.qr-wrap{background:#f9f9f9;border-radius:16px;padding:20px;display:inline-block;margin-bottom:24px;}';
+  html+='.qr-wrap svg,.qr-wrap canvas,.qr-wrap img{width:200px!important;height:200px!important;display:block;}';
+  html+='.scan-txt{font-size:18px;font-weight:800;color:#111;margin-bottom:6px;}';
+  html+='.scan-sub{font-size:12px;color:#999;margin-bottom:20px;line-height:1.5;}';
+  html+='.steps{text-align:left;background:#fff8ee;border-radius:12px;padding:14px 16px;margin-bottom:20px;}';
+  html+='.step{font-size:12px;color:#555;margin-bottom:4px;display:flex;gap:8px;}';
+  html+='.step:last-child{margin-bottom:0;}';
+  html+='.step span:first-child{color:#f5a623;font-weight:800;flex-shrink:0;}';
+  html+='.footer{font-size:10px;color:#ccc;border-top:1px solid #f0f0f0;padding-top:14px;}';
+  html+='@media print{body{min-height:unset;}@page{margin:10mm;}}';
+  html+='</style></head><body>';
+  html+='<div class="card">';
+  html+='<div class="logo">AttendPro</div>';
+  html+='<div class="biz">'+(biz.name||'')+'</div>';
+  html+='<div class="loc">'+(biz.location||'')+'</div>';
+  html+='<div class="qr-wrap">'+el.innerHTML+'</div>';
+  html+='<div class="scan-txt">📱 Scan to Mark Attendance</div>';
+  html+='<div class="scan-sub">Open your camera app and scan<br>the QR code above</div>';
+  html+='<div class="steps">';
+  html+='<div class="step"><span>1️⃣</span><span>Scan the QR code with your phone camera</span></div>';
+  html+='<div class="step"><span>2️⃣</span><span>Enter your username and PIN</span></div>';
+  html+='<div class="step"><span>3️⃣</span><span>Tap Punch In / Punch Out</span></div>';
+  html+='</div>';
+  html+='<div class="footer">Staff attendance · '+(biz.name||'')+'</div>';
+  html+='</div>';
+  html+='</body></html>';
+  w.document.write(html);
   w.document.close();
-  w.setTimeout(()=>w.print(), 600);
-  w.document.close();
+  w.setTimeout(function(){w.print();},600);
 };
 
 // ─────────────────────────────────────────────
@@ -3052,7 +3087,7 @@ textarea.form-input{resize:none;}
     <div class="landing-logo">AP</div>
     <div style="font-family:var(--fh);font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:8px;">Manage your staff<br><span style="background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">the smart way</span></div>
     <div style="color:var(--muted);font-size:14px;line-height:1.6;max-width:320px;margin:0 auto 14px;">Attendance, payroll, leaves & advances — all in one place. Built for small businesses.</div>
-    <span style="display:inline-block;font-size:12px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;padding:5px 16px;letter-spacing:.5px;margin-bottom:20px;box-shadow:0 4px 14px rgba(245,166,35,.35);">v1.17.5</span>
+    <span style="display:inline-block;font-size:12px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;padding:5px 16px;letter-spacing:.5px;margin-bottom:20px;box-shadow:0 4px 14px rgba(245,166,35,.35);">v1.17.6</span>
   </div>
   <div class="feature-grid">
     <div class="feature-card"><div class="feature-icon">👁️</div><div class="feature-title">Selfie Proof</div><div class="feature-desc">Anti-proxy attendance with photo verification</div></div>
@@ -3889,7 +3924,7 @@ window.joinBusiness = async function(){
     <div class="card-sm" style="margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div><div style="font-family:var(--fh);font-size:14px;font-weight:700;">AttendPro</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Staff Management Platform</div></div>
-        <span style="font-size:11px;font-weight:700;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:20px;padding:3px 10px;">v1.17.5</span>
+        <span style="font-size:11px;font-weight:700;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:20px;padding:3px 10px;">v1.17.6</span>
       </div>
     </div>
     <div class="card-sm" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
@@ -3897,10 +3932,10 @@ window.joinBusiness = async function(){
       <button class="btn btn-ghost btn-sm" onclick="toggleNotifications()" id="notif-toggle-btn">Enable</button>
     </div>
     <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">📋 What's New</div>
-    <!-- v1.17.5 -->
+    <!-- v1.17.6 -->
     <div style="margin-bottom:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--accent);">v1.17.5</span>
+        <span style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--accent);">v1.17.6</span>
         <span style="font-size:10px;font-weight:700;color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:2px 7px;">CURRENT</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:7px;">
