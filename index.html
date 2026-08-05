@@ -677,13 +677,14 @@ window.ownerLogin=function(){
 };
 window.ownerLogout=function(){
   if(_inboxListener){_inboxListener();_inboxListener=null;}
-  localStorage.removeItem('ap_owner_session'); // clear session
-  document.getElementById('owner-login-wrap').style.display='block';
-  document.getElementById('owner-panel-wrap').style.display='none';
-  document.getElementById('owner-user-inp').value='';
-  document.getElementById('owner-pass-inp').value='';
-  if(currentStaff)openStaffDashboard();
-  else{document.getElementById('login-biz-name').textContent=biz.name;showScreen('screen-login');}
+  // Full clear — so user can switch to any business
+  localStorage.removeItem('ap_owner_session');
+  localStorage.removeItem('ap_biz_id');
+  localStorage.removeItem('ap_biz_cache');
+  localStorage.removeItem('ap_staff_cache');
+  localStorage.removeItem('ap_settings_cache');
+  BIZ_ID=null;biz={};staffArr=[];settings={};
+  showScreen('screen-landing');
 };
 
 // ─────────────────────────────────────────────
@@ -1449,11 +1450,8 @@ window.renderPayroll=async function(){
       }
       if(mark&&(mark.type==='holiday'||mark.type==='leave')){
         offDays++;
-        // Paid leave — credit standard hours
-        if(mark.type==='leave'&&mark.paidLeave){
-          totalWorkedMins+=stdMins;
-          paidLeaveDays++;
-        }
+        // Paid leave — count separately, NOT added to totalWorkedMins (added to net directly)
+        if(mark.type==='leave'&&mark.paidLeave) paidLeaveDays++;
         continue;
       }
       workDays++;
@@ -1561,7 +1559,8 @@ window.renderPayroll=async function(){
     }
 
     const advRecover=Math.min(parseInt(advInput&&advInput.value)||0, totalOutstanding);
-    const netBeforeAdv=Math.max(0,basePay+otPay+incentive+weeklyOffBonus+woPay-lateD);
+    var paidLeaveAmt=paidLeaveDays*perDay;
+    const netBeforeAdv=Math.max(0,basePay+otPay+incentive+weeklyOffBonus+woPay+paidLeaveAmt-lateD);
     const advActual=Math.min(advRecover,netBeforeAdv);
     const net=Math.max(0,netBeforeAdv-advActual);
     const advCarryFwd=totalOutstanding-advActual;
@@ -3053,7 +3052,7 @@ textarea.form-input{resize:none;}
     <div class="landing-logo">AP</div>
     <div style="font-family:var(--fh);font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:8px;">Manage your staff<br><span style="background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">the smart way</span></div>
     <div style="color:var(--muted);font-size:14px;line-height:1.6;max-width:320px;margin:0 auto 14px;">Attendance, payroll, leaves & advances — all in one place. Built for small businesses.</div>
-    <span style="display:inline-block;font-size:12px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;padding:5px 16px;letter-spacing:.5px;margin-bottom:20px;box-shadow:0 4px 14px rgba(245,166,35,.35);">v1.17.3</span>
+    <span style="display:inline-block;font-size:12px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;padding:5px 16px;letter-spacing:.5px;margin-bottom:20px;box-shadow:0 4px 14px rgba(245,166,35,.35);">v1.17.5</span>
   </div>
   <div class="feature-grid">
     <div class="feature-card"><div class="feature-icon">👁️</div><div class="feature-title">Selfie Proof</div><div class="feature-desc">Anti-proxy attendance with photo verification</div></div>
@@ -3890,7 +3889,7 @@ window.joinBusiness = async function(){
     <div class="card-sm" style="margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div><div style="font-family:var(--fh);font-size:14px;font-weight:700;">AttendPro</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Staff Management Platform</div></div>
-        <span style="font-size:11px;font-weight:700;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:20px;padding:3px 10px;">v1.17.3</span>
+        <span style="font-size:11px;font-weight:700;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:20px;padding:3px 10px;">v1.17.5</span>
       </div>
     </div>
     <div class="card-sm" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
@@ -3898,10 +3897,10 @@ window.joinBusiness = async function(){
       <button class="btn btn-ghost btn-sm" onclick="toggleNotifications()" id="notif-toggle-btn">Enable</button>
     </div>
     <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">📋 What's New</div>
-    <!-- v1.17.3 -->
+    <!-- v1.17.5 -->
     <div style="margin-bottom:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--accent);">v1.17.3</span>
+        <span style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--accent);">v1.17.5</span>
         <span style="font-size:10px;font-weight:700;color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:2px 7px;">CURRENT</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:7px;">
