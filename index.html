@@ -2334,17 +2334,16 @@ window.saRestoreBiz=async function(bizId,bizName){
         var sc=staffCounts[bizList.indexOf(b)];
         var adv=advTotals[bizList.indexOf(b)];
         var joined=b.createdAt?new Date(b.createdAt).toLocaleDateString('en-IN'):'—';
-        var safeName=(b.name||'').replace(/'/g,"\\'");
+        var actionBtn=isArchived
+          ?'<button class="sa-biz-btn" data-action="restore" data-id="'+b.id+'" data-name="'+( b.name||'').replace(/"/g,'&quot;')+'" style="background:none;border:1px solid var(--green);color:var(--green);border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;">✅ Restore</button>'
+          :'<button class="sa-biz-btn" data-action="archive" data-id="'+b.id+'" data-name="'+( b.name||'').replace(/"/g,'&quot;')+'" style="background:none;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;">📦 Archive</button>';
         return '<div class="card" style="margin-bottom:12px;'+(isArchived?'opacity:0.6;':'')+'">'
           +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">'
           +'<div><div style="font-weight:800;font-size:15px;font-family:var(--fh);">'+(b.name||'—')+(isArchived?' <span style="font-size:10px;background:var(--red);color:#fff;border-radius:6px;padding:2px 6px;">ARCHIVED</span>':'')+'</div>'
           +'<div style="font-size:12px;color:var(--muted);">'+(b.location||'')+'</div></div>'
           +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">'
           +'<div style="font-size:11px;color:var(--muted);">Code: <strong>'+(b.companyCode||'—')+'</strong></div>'
-          +(isArchived
-            ?'<button onclick="saRestoreBiz(\''+b.id+'\',\''+safeName+'\')" style="background:none;border:1px solid var(--green);color:var(--green);border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;">✅ Restore</button>'
-            :'<button onclick="saArchiveBiz(\''+b.id+'\',\''+safeName+'\')" style="background:none;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;">📦 Archive</button>'
-          )
+          +actionBtn
           +'</div></div>'
           +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'
           +'<div style="background:var(--s1);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:var(--green);">'+sc+'</div><div style="font-size:10px;color:var(--muted);">Staff</div></div>'
@@ -2363,6 +2362,15 @@ window.saRestoreBiz=async function(bizId,bizName){
         html+=archivedBiz.map(function(b){return renderBizCard(b,0,true);}).join('');
       }
     document.getElementById('sa-biz-list').innerHTML=html||'<div class="empty-state"><div class="emoji">🏢</div>No businesses yet</div>';
+    document.getElementById('sa-biz-list').onclick=function(e){
+      var btn=e.target.closest('.sa-biz-btn');
+      if(!btn)return;
+      var action=btn.dataset.action;
+      var id=btn.dataset.id;
+      var name=btn.dataset.name;
+      if(action==='archive') saArchiveBiz(id,name);
+      else if(action==='restore') saRestoreBiz(id,name);
+    };
   }catch(e){toast('Error loading dashboard: '+e.message,true);}
 }
 var ksBiz=null, ksBizId=null, ksStaffArr=[], ksSettings={};
@@ -3256,7 +3264,7 @@ textarea.form-input{resize:none;}
     <div class="landing-logo">AP</div>
     <div style="font-family:var(--fh);font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:8px;">Manage your staff<br><span style="background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">the smart way</span></div>
     <div style="color:var(--muted);font-size:14px;line-height:1.6;max-width:320px;margin:0 auto 14px;">Attendance, payroll, leaves & advances — all in one place. Built for small businesses.</div>
-    <span style="display:inline-block;font-size:12px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;padding:5px 16px;letter-spacing:.5px;margin-bottom:20px;box-shadow:0 4px 14px rgba(245,166,35,.35);">v1.18.3</span>
+    <span style="display:inline-block;font-size:12px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;padding:5px 16px;letter-spacing:.5px;margin-bottom:20px;box-shadow:0 4px 14px rgba(245,166,35,.35);">v1.18.4</span>
   </div>
   <div class="feature-grid">
     <div class="feature-card"><div class="feature-icon">👁️</div><div class="feature-title">Selfie Proof</div><div class="feature-desc">Anti-proxy attendance with photo verification</div></div>
@@ -4140,7 +4148,7 @@ window.joinBusiness = async function(){
     <div class="card-sm" style="margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div><div style="font-family:var(--fh);font-size:14px;font-weight:700;">AttendPro</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Staff Management Platform</div></div>
-        <span style="font-size:11px;font-weight:700;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:20px;padding:3px 10px;">v1.18.3</span>
+        <span style="font-size:11px;font-weight:700;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:20px;padding:3px 10px;">v1.18.4</span>
       </div>
     </div>
     <div class="card-sm" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
@@ -4148,10 +4156,10 @@ window.joinBusiness = async function(){
       <button class="btn btn-ghost btn-sm" onclick="toggleNotifications()" id="notif-toggle-btn">Enable</button>
     </div>
     <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">📋 What's New</div>
-    <!-- v1.18.3 -->
+    <!-- v1.18.4 -->
     <div style="margin-bottom:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--accent);">v1.18.3</span>
+        <span style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--accent);">v1.18.4</span>
         <span style="font-size:10px;font-weight:700;color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:2px 7px;">CURRENT</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:7px;">
